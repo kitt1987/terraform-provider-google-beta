@@ -230,7 +230,19 @@ func resourceFirestoreDatabaseCreate(d *schema.ResourceData, meta interface{}) e
 
 	log.Printf("[DEBUG] Finished creating Database %q: %#v", d.Id(), res)
 
-	return resourceFirestoreDatabaseRead(d, meta)
+	// Retry to work around https://github.com/hashicorp/terraform-provider-google/issues/14228
+	retries := 0
+	for retries < 5 {
+		retries++
+		if err = resourceFirestoreDatabaseRead(d, meta); err == nil {
+			return err
+		}
+
+		log.Printf("[DEBUG] Unable to fetch the created firestore database %q at round %d: %s", d.Id(), retries+1, err)
+		time.Sleep(time.Second)
+	}
+
+	return err
 }
 
 func resourceFirestoreDatabaseRead(d *schema.ResourceData, meta interface{}) error {
